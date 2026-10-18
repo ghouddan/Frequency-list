@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanish Frequency Vocabulary Portal</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --danger: #dc2626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
+    .container { max-width: 900px; margin: 0 auto; }
+
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    h1 { font-size: 1.5rem; color: #0f172a; }
+
+    nav { display: flex; gap: 8px; background: #e2e8f0; padding: 4px; border-radius: 8px; }
+    nav button { border: none; background: transparent; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+    nav button.active { background: white; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+
+    /* Controls */
+    .controls { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    input[type="text"], select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; outline: none; }
+    input[type="text"]:focus, select:focus { border-color: var(--primary); }
+    .search-input { flex-grow: 1; }
+
+    /* Table */
+    .table-container { overflow-x: auto; max-height: 600px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 12px; border-bottom: 1px solid var(--border); }
+    th { background: #f1f5f9; position: sticky; top: 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+    tr:hover { background-color: #f8fafc; }
+
+    /* Test Mode */
+    .test-config { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+    .card-test { text-align: center; padding: 40px 20px; }
+    .prompt-word { font-size: 2.5rem; font-weight: bold; margin-bottom: 8px; color: #0f172a; }
+    .prompt-sub { color: #64748b; font-size: 0.9rem; margin-bottom: 24px; }
+    .test-input-group { display: flex; justify-content: center; gap: 8px; max-width: 400px; margin: 0 auto 16px auto; }
+    .test-input-group input { flex-grow: 1; font-size: 1.1rem; text-align: center; }
+    .btn { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 500; cursor: pointer; }
+    .btn:hover { background: var(--primary-hover); }
+    
+    .feedback { font-weight: 600; font-size: 1.1rem; margin-top: 12px; min-height: 1.6em; }
+    .feedback.correct { color: var(--success); }
+    .feedback.incorrect { color: var(--danger); }
+    
+    .score-board { display: flex; justify-content: space-around; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 0.9rem; color: #64748b; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Spanish 1000 Frequency Portal</h1>
+    <nav>
+      <button id="btn-reader" class="active" onclick="switchMode('reader')">Reader</button>
+      <button id="btn-test" onclick="switchMode('test')">Test</button>
+    </nav>
+  </header>
+
+  <!-- READER MODE -->
+  <div id="mode-reader" class="card">
+    <div class="controls">
+      <input type="text" id="search" class="search-input" placeholder="Search Spanish or English..." oninput="renderTable()">
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Spanish Form</th>
+            <th>Lemma</th>
+            <th>English Translation</th>
+            <th>PPM</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TEST MODE -->
+  <div id="mode-test" class="card hidden">
+    <div class="test-config">
+      <label>Direction:
+        <select id="test-direction" onchange="resetTest()">
+          <option value="es-en">Spanish → English</option>
+          <option value="en-es">English → Spanish</option>
+        </select>
+      </label>
+      <label>Range:
+        <select id="test-range" onchange="resetTest()">
+          <option value="100">Top 100</option>
+          <option value="500">Top 500</option>
+          <option value="1000" selected>All 1000</option>
+        </select>
+      </label>
+      <button class="btn" onclick="resetTest()">Restart</button>
+    </div>
+
+    <div class="card-test">
+      <div id="prompt-word" class="prompt-word">---</div>
+      <div id="prompt-sub" class="prompt-sub">Lemma: ---</div>
+
+      <form onsubmit="checkAnswer(event)" class="test-input-group">
+        <input type="text" id="test-input" placeholder="Type answer here..." autocomplete="off">
+        <button type="submit" class="btn">Submit</button>
+      </form>
+
+      <div id="feedback" class="feedback"></div>
+
+      <div class="score-board">
+        <div>Score: <strong id="score-correct">0</strong>/<strong id="score-total">0</strong></div>
+        <div>Accuracy: <strong id="score-acc">0%</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Raw data with simple translation mapping rules
+const rawData = `1.que32894que
+2.de32116de
+3.no29897no
+4.a22313a
+5.la21127la
+6.el18112el
+7.es16620ser
+8.y15743y
+9.en15303en
+10.lo14010lo
+11.un13410un
+12.por10261por
+13.qué9903qué
+14.me9692me
+15.una8656un
+16.te8094te
+17.los7589lo
+18.se7426se
+19.con6799con
+20.para6455para
+21.mi5987mi
+22.está5909estar
+23.si5880si
+24.bien5293bien
+25.pero5012pero
+26.yo4800yo
+27.eso4788eso
+28.las4748la
+29.sí4704sí
+30.su4549su
+31.tu4194tu
+32.aquí3952aquí
+33.del3911del
+34.al3887al
+35.como3760como
+36.le3470le
+37.más3395más
+38.esto3152esto
+39.ya2944ya
+40.todo2929todo
+41.esta2927esta
+42.vamos2830ir
+43.muy2618muy
+44.hay2584haber
+45.ahora2523ahora
+46.algo2469algo
+47.estoy2454estar
+48.tengo2349tener
+49.nos2247nos
+50.tú2232tú
+51.nada2122nada
+52.cuando2098cuando
+53.ha2079haber
+54.este2069este
+55.sé2066saber
+56.estás2045estar
+57.así2044así
+58.puedo1972poder
+59.cómo1969cómo
+60.quiero1940querer
+61.sólo1933sólo
+62.soy1913ser
+63.tiene1908tener
+64.gracias1886gracias
+65.o1850o
+66.él1836él
+67.bueno1824bueno
+68.fue1811ser ir
+69.ser1782ser
+70.hacer1749hacer
+71.son1703ser
+72.todos1687todo
+73.era1677ser
+74.eres1677ser
+75.vez1652vez
+76.tienes1636tener
+77.creo1584creer
+78.ella1570ella
+79.he1570haber
+80.ese1508ese
+81.voy1478ir
+82.puede1433poder
+83.sabes1422saber
+84.hola1393hola
+85.sus1384su
+86.porque1362porque
+87.dios1356dios
+88.quién1351quién
+89.nunca1342nunca
+90.dónde1335dónde
+91.quieres1331querer
+92.casa1330casa casar
+93.favor1313favor
+94.esa1306ese
+95.dos1301dos
+96.tan1291tanto
+97.señor1289señor
+98.tiempo1288tiempo
+99.verdad1269verdad
+100.estaba1250estar
+101.mejor1234mejor
+102.están1232estar
+103.va1219ir
+104.hombre1219hombre
+105.usted1218usted
+106.mucho1208mucho
+107.hace1195hacer
+108.entonces1194entonces
+109.siento1186sentir sentar
+110.tenemos1177tener
+111.puedes1134poder
+112.ahí1126ahí
+113.ti1103ti
+114.vida1101vida
+115.ver1097ver
+116.alguien1046alguien
+117.sr1040señor
+118.hasta1032hasta
+119.sin1029sin
+120.mí1022mí
+121.solo1013solo
+122.años1003año
+123.sobre996sobre
+124.decir995decir
+125.uno993uno
+126.siempre986siempre
+127.oh985oh
+128.ir964ir
+129.cosas962cosa coser
+130.también962también
+131.antes955antes
+132.has942haber
+133.ni941ni
+134.mis937mi
+135.día917día
+136.estar907estar
+137.estamos906estar
+138.noche868noche
+139.nadie865nadie
+140.otra857otro
+141.quiere855querer
+142.parece851parecer
+143.nosotros847nosotros
+144.poco844poco
+145.padre833padre
+146.trabajo828trabajo trabajar
+147.gente827gente
+148.mira825mirar
+149.vas817ir
+150.sea814ser
+151.les806les
+152.donde806donde
+153.mismo796mismo
+154.hecho795hacer hecho
+155.ellos792ellos
+156.dijo770decir
+157.pasa751pasar
+158.dinero740dinero
+159.hijo728hijo
+160.tal724tal
+161.otro710otro
+162.hablar706hablar
+163.seguro704seguro
+164.claro699claro
+165.estas685este
+166.lugar684lugar
+167.mundo683mundo
+168.amigo678amigo
+169.espera674esperar espera
+170.mierda673mierda
+171.han673haber
+172.tus670tu
+173.sabe669saber
+174.después661después
+175.momento656momento
+176.desde653desde
+177.fuera650fuera ir ser
+178.cosa648cosa coser
+179.tipo647tipo
+180.mañana646mañana
+181.podemos623poder
+182.dije617decir
+183.gran608grande
+184.necesito607necesitar
+185.estado597estar estado
+186.podría591poder
+187.acuerdo591acordar acuerdo
+188.papá587papá
+189.tener583tener
+190.dice583decir
+191.mío581mío
+192.crees580creer
+193.buena578bueno buena
+194.gusta573gustar
+195.nuestro573nuestro
+196.nuevo572nuevo
+197.será570ser
+198.haciendo568hacer
+199.días566día
+200.nombre565nombre`;
+
+// English translation map for common vocabulary entries
+const dict = {
+  "que": "that / than", "de": "of / from", "no": "no / not", "a": "to / at", "la": "the (fem.)",
+  "el": "the (masc.)", "es": "is", "y": "and", "en": "in / on", "lo": "it / the", "un": "a / an",
+  "por": "for / by", "qué": "what", "me": "me / myself", "una": "a / an (fem.)", "te": "you (object)",
+  "los": "the (plural)", "se": "himself / herself / itself", "con": "with", "para": "for / in order to",
+  "mi": "my", "está": "is (location/state)", "si": "if", "bien": "well / good", "pero": "but",
+  "yo": "I", "eso": "that", "las": "the (fem. plural)", "sí": "yes", "su": "his / her / your",
+  "tu": "your", "aquí": "here", "del": "of the", "al": "to the", "como": "like / as", "le": "him / her (indirect)",
+  "más": "more", "esto": "this", "ya": "already / now", "todo": "all / everything", "esta": "this (fem.)",
+  "vamos": "let's go / we go", "muy": "very", "hay": "there is / there are", "ahora": "now", "algo": "something",
+  "estoy": "I am", "tengo": "I have", "nos": "us", "tú": "you", "nada": "nothing", "cuando": "when",
+  "ha": "has", "este": "this", "sé": "I know", "estás": "you are", "así": "like this / so", "puedo": "I can",
+  "cómo": "how", "quiero": "I want", "sólo": "only", "soy": "I am", "tiene": "has", "gracias": "thanks",
+  "o": "or", "él": "he", "bueno": "good", "fue": "was / went", "ser": "to be", "hacer": "to do / make",
+  "son": "they are", "todos": "everyone / all", "era": "was", "eres": "you are", "vez": "time / occasion",
+  "tienes": "you have", "creo": "I believe / think", "ella": "she", "he": "I have (auxiliary)",
+  "ese": "that", "voy": "I go", "puede": "can / is able to", "sabes": "you know", "hola": "hello",
+  "sus": "their / his / her", "porque": "because", "dios": "god", "quién": "who", "nunca": "never",
+  "dónde": "where", "quieres": "you want", "casa": "house", "favor": "favor", "esa": "that (fem.)",
+  "dos": "two", "tan": "so / as", "señor": "sir / mister", "tiempo": "time / weather", "verdad": "truth",
+  "estaba": "was", "mejor": "better / best", "están": "they are", "va": "goes", "hombre": "man",
+  "usted": "you (formal)", "mucho": "much / a lot", "hace": "does / makes", "entonces": "then",
+  "siento": "I feel / sorry", "tenemos": "we have", "puedes": "you can", "ahí": "there", "ti": "you",
+  "vida": "life", "ver": "to see", "alguien": "someone", "sr": "mr.", "hasta": "until / even",
+  "sin": "without", "mí": "me", "solo": "alone / single", "años": "years", "sobre": "about / on",
+  "decir": "to say / tell", "uno": "one", "siempre": "always", "oh": "oh", "ir": "to go",
+  "cosas": "things", "también": "also / too", "antes": "before", "has": "you have", "ni": "neither / nor",
+  "mis": "my (plural)", "día": "day", "estar": "to be", "estamos": "we are", "noche": "night",
+  "nadie": "nobody", "otra": "other / another", "quiere": "wants", "parece": "seems / appears",
+  "nosotros": "we", "poco": "little / few", "padre": "father", "trabajo": "job / work", "gente": "people",
+  "mira": "look", "vas": "you go", "sea": "be / is", "les": "them (indirect)", "donde": "where",
+  "mismo": "same", "hecho": "done / fact", "ellos": "they", "dijo": "said", "pasa": "happens / passes",
+  "dinero": "money", "hijo": "son", "tal": "such / so", "otro": "other / another", "hablar": "to speak",
+  "seguro": "sure / safe", "claro": "clear / sure", "estas": "these (fem.)", "lugar": "place",
+  "mundo": "world", "amigo": "friend", "espera": "wait", "mierda": "shit", "han": "they have",
+  "tus": "your (plural)", "sabe": "knows", "después": "after", "momento": "moment", "desde": "from / since",
+  "fuera": "outside / were", "cosa": "thing", "tipo": "guy / type", "mañana": "tomorrow / morning",
+  "podemos": "we can", "dije": "I said", "gran": "great / big", "necesito": "I need", "estado": "state / been",
+  "podría": "could", "acuerdo": "agreement", "papá": "dad", "tener": "to have", "dice": "says",
+  "mío": "mine", "crees": "you think", "buena": "good (fem.)", "gusta": "likes", "nuestro": "our",
+  "nuevo": "new", "será": "will be", "haciendo": "doing / making", "días": "days", "nombre": "name"
+};
+
+// Parse input list
+let words = [];
+const lines = rawData.split('\n');
+lines.forEach(line => {
+  const match = line.match(/^(\d+)\.([^\d]+)(\d+)(.+)$/);
+  if (match) {
+    const rank = parseInt(match[1]);
+    const word = match[2].trim();
+    const ppm = parseInt(match[3]);
+    const lemma = match[4].trim();
+    const translation = dict[word] || dict[lemma] || word; // Fallback to word if not mapped
+
+    words.push({ rank, word, ppm, lemma, translation });
+  }
+});
+
+
+// Continuation: ranks 201-1000.
+// Ranking follows Wiktionary:Frequency_lists/Spanish1000, which matches the
+// original 1-200 dataset in this file.
+const extraData = [[201, "buen", "good"], [202, "había", "there was"], [203, "ven", "come/see"], [204, "tres", "three"], [205, "menos", "less"], [206, "debe", "must/should"], [207, "tenía", "had"], [208, "mal", "badly/bad"], [209, "conmigo", "with me"], [210, "madre", "mother"], [211, "hoy", "today"], [212, "quien", "who"], [213, "sido", "been"], [214, "mamá", "mom"], [215, "tienen", "they have"], [216, "luego", "then/later"], [217, "todas", "all"], [218, "allí", "there"], [219, "toda", "all/whole"], [220, "hora", "hour"], [221, "mujer", "woman"], [222, "visto", "seen"], [223, "haces", "you do/make"], [224, "importa", "matters"], [225, "contigo", "with you"], [226, "ve", "go/see"], [227, "tarde", "late/afternoon"], [228, "oye", "hey/listen"], [229, "parte", "part"], [230, "haber", "to have"], [231, "hombres", "men"], [232, "problema", "problem"], [233, "mas", "but"], [234, "saber", "to know"], [235, "quería", "wanted"], [236, "aún", "still/yet"], [237, "veces", "times"], [238, "nuestra", "our"], [239, "hacerlo", "do it"], [240, "cada", "each/every"], [241, "hizo", "did/made"], [242, "veo", "I see"], [243, "tanto", "so much"], [244, "razón", "reason"], [245, "ustedes", "you (plural)"], [246, "idea", "idea"], [247, "esos", "those"], [248, "van", "they go"], [249, "quizá", "perhaps"], [250, "debo", "I must"], [251, "alguna", "some/any"], [252, "cierto", "certain/right"], [253, "ud", "you (formal)"], [254, "muerto", "dead"], [255, "unos", "some/a few"], [256, "estos", "these"], [257, "salir", "to leave/go out"], [258, "policía", "police"], [259, "realmente", "really"], [260, "demasiado", "too much/too"], [261, "familia", "family"], [262, "pueden", "they can"], [263, "cabeza", "head"], [264, "hemos", "we have"], [265, "amigos", "friends"], [266, "chica", "girl"], [267, "cariño", "darling/love"], [268, "lado", "side"], [269, "allá", "over there"], [270, "entre", "between/among"], [271, "minutos", "minutes"], [272, "digo", "I say"], [273, "algún", "some/any"], [274, "serio", "serious"], [275, "cuidado", "care/caution"], [276, "pasó", "happened/passed"], [277, "buenas", "good"], [278, "somos", "we are"], [279, "amor", "love"], [280, "puerta", "door"], [281, "ves", "you see"], [282, "vaya", "go/well"], [283, "ah", "ah"], [284, "suerte", "luck"], [285, "eh", "hey"], [286, "rápido", "fast/quick"], [287, "cuenta", "account/count"], [288, "quizás", "perhaps"], [289, "esas", "those"], [290, "pues", "well/then"], [291, "pasado", "past"], [292, "pensé", "I thought"], [293, "todavía", "still"], [294, "hermano", "brother"], [295, "debes", "you must/should"], [296, "casi", "almost"], [297, "forma", "form/way"], [298, "aqui", "here"], [299, "chico", "boy/guy"], [300, "ok", "okay"], [301, "dicho", "said/saying"], [302, "nueva", "new"], [303, "sabía", "knew"], [304, "muchas", "many"], [305, "dentro", "inside"], [306, "hice", "I did/made"], [307, "contra", "against"], [308, "auto", "car"], [309, "camino", "road/way"], [310, "ayuda", "help"], [311, "primera", "first"], [312, "hacia", "toward"], [313, "vi", "I saw"], [314, "miedo", "fear"], [315, "adiós", "goodbye"], [316, "primero", "first"], [317, "debería", "should"], [318, "poder", "to be able to"], [319, "niños", "children"], [320, "sería", "would be"], [321, "historia", "story/history"], [322, "hey", "hey"], [323, "mientras", "while"], [324, "ciudad", "city"], [325, "dijiste", "you said"], [326, "espero", "I hope"], [327, "cuánto", "how much"], [328, "esposa", "wife"], [329, "pronto", "soon"], [330, "chicos", "boys/guys"], [331, "cualquier", "any/whatever"], [332, "viejo", "old"], [333, "debemos", "we must/should"], [334, "deja", "leave/let"], [335, "año", "year"], [336, "muerte", "death"], [337, "hablando", "speaking/talking"], [338, "manos", "hands"], [339, "da", "gives/give"], [340, "loco", "crazy"], [341, "problemas", "problems"], [342, "mano", "hand"], [343, "guerra", "war"], [344, "semana", "week"], [345, "pasar", "to pass/happen"], [346, "vale", "okay/worth"], [347, "cuál", "which/what"], [348, "viene", "comes/is coming"], [349, "volver", "to return"], [350, "toma", "take"], [351, "caso", "case"], [352, "agua", "water"], [353, "haré", "I will do/make"], [354, "vete", "go away"], [355, "entiendo", "I understand"], [356, "horas", "hours"], [357, "personas", "people"], [358, "capitán", "captain"], [359, "adelante", "forward/ahead"], [360, "niño", "child/boy"], [361, "listo", "ready/smart"], [362, "noches", "nights"], [363, "buenos", "good"], [364, "iba", "was going"], [365, "juntos", "together"], [366, "dame", "give me"], [367, "único", "only/unique"], [368, "déjame", "let me"], [369, "cerca", "near/close"], [370, "otros", "others"], [371, "sigue", "continues/follows"], [372, "grande", "big/great"], [373, "arriba", "up/above"], [374, "jefe", "boss"], [375, "habla", "speaks/speech"], [376, "supongo", "I suppose"], [377, "manera", "way/manner"], [378, "quieren", "they want"], [379, "feliz", "happy"], [380, "significa", "means"], [381, "sangre", "blood"], [382, "fin", "end"], [383, "bajo", "low/under"], [384, "llama", "calls/flame"], [385, "venir", "to come"], [386, "morir", "to die"], [387, "importante", "important"], [388, "hiciste", "you did/made"], [389, "ojos", "eyes"], [390, "escucha", "listen"], [391, "entrar", "to enter"], [392, "ningún", "no/none"], [393, "corazón", "heart"], [394, "diablos", "devils/hell"], [395, "necesitamos", "we need"], [396, "atrás", "back/behind"], [397, "durante", "during"], [398, "dices", "you say"], [399, "nuestros", "our"], [400, "persona", "person"], [401, "abajo", "down/below"], [402, "dr", "doctor"], [403, "hija", "daughter"], [404, "dejar", "to leave/let"], [405, "necesita", "needs"], [406, "llegar", "to arrive"], [407, "hago", "I do/make"], [408, "señora", "lady/mrs."], [409, "haya", "there is/has"], [410, "suficiente", "enough"], [411, "doctor", "doctor"], [412, "gustaría", "would like"], [413, "tierra", "earth/land"], [414, "cara", "face"], [415, "siquiera", "even/at least"], [416, "genial", "great"], [417, "cree", "believes"], [418, "supuesto", "supposed"], [419, "tomar", "to take"], [420, "equipo", "team/equipment"], [421, "justo", "fair/just"], [422, "juego", "game"], [423, "ninguna", "none"], [424, "matar", "to kill"], [425, "cinco", "five"], [426, "dicen", "they say"], [427, "amo", "I love/master"], [428, "cuándo", "when"], [429, "pequeño", "small"], [430, "algunos", "some"], [431, "conozco", "I know"], [432, "clase", "class"], [433, "maldito", "damned"], [434, "unas", "some"], [435, "muchos", "many"], [436, "hubiera", "would have/had"], [437, "segundo", "second"], [438, "aunque", "although"], [439, "pueda", "may/can"], [440, "dime", "tell me"], [441, "igual", "same/equal"], [442, "comida", "food"], [443, "ay", "ow/oh"], [444, "cuerpo", "body"], [445, "encontrar", "to find"], [446, "fuerte", "strong"], [447, "vuelta", "return/turn"], [448, "venga", "come on"], [449, "creer", "to believe"], [450, "realidad", "reality"], [451, "saben", "they know"], [452, "puta", "whore/fuck"], [453, "deberías", "you should"], [454, "pregunta", "question"], [455, "fui", "I went/was"], [456, "cuatro", "four"], [457, "sra", "Mrs."], [458, "primer", "first"], [459, "trabajar", "to work"], [460, "e", "and"], [461, "hagas", "you do/make"], [462, "alto", "tall/high"], [463, "maldita", "damned"], [464, "comer", "to eat"], [465, "número", "number"], [466, "dar", "to give"], [467, "necesitas", "you need"], [468, "oportunidad", "opportunity"], [469, "punto", "point"], [470, "misma", "same"], [471, "última", "last"], [472, "afuera", "outside"], [473, "mujeres", "women"], [474, "pensar", "to think"], [475, "fueron", "they went/were"], [476, "difícil", "difficult"], [477, "vivir", "to live"], [478, "paso", "step/passage"], [479, "malo", "bad"], [480, "estabas", "you were"], [481, "vivo", "alive"], [482, "haga", "do/make"], [483, "queda", "remains/stays"], [484, "hijos", "children/sons"], [485, "mayor", "older/greater"], [486, "fiesta", "party"], [487, "hacen", "they do/make"], [488, "medio", "half/means"], [489, "algunas", "some"], [490, "basta", "enough"], [491, "arma", "weapon"], [492, "vino", "came/wine"], [493, "meses", "months"], [494, "cuarto", "room/fourth"], [495, "éste", "this one"], [496, "escuela", "school"], [497, "esté", "be/is"], [498, "dólares", "dollars"], [499, "tío", "uncle"], [500, "posible", "possible"], [501, "tuve", "I had"], [502, "fácil", "easy"], [503, "preocupes", "worry"], [504, "luz", "light"], [505, "eran", "they were"], [506, "carajo", "damn/fuck"], [507, "final", "end/final"], [508, "lista", "list"], [509, "trata", "tries/deals"], [510, "armas", "weapons"], [511, "hermana", "sister"], [512, "exactamente", "exactly"], [513, "chicas", "girls"], [514, "podía", "could/was able"], [515, "bastante", "enough/quite"], [516, "seguridad", "security/safety"], [517, "pasando", "passing/happening"], [518, "esperando", "waiting/hoping"], [519, "acá", "here"], [520, "teléfono", "phone"], [521, "perro", "dog"], [522, "fuego", "fire"], [523, "murió", "died"], [524, "tampoco", "neither/either"], [525, "sola", "alone"], [526, "estuvo", "was/stayed"], [527, "verte", "to see you"], [528, "iré", "I will go"], [529, "tenido", "had"], [530, "culpa", "blame/guilt"], [531, "veras", "you will see"], [532, "adónde", "where to"], [533, "buscando", "looking/searching"], [534, "cuanto", "as much/as"], [535, "padres", "parents"], [536, "paz", "peace"], [537, "demonios", "demons"], [538, "estará", "will be"], [539, "cual", "which"], [540, "perdón", "sorry/forgiveness"], [541, "asi", "so/like this"], [542, "jugar", "to play"], [543, "pensando", "thinking"], [544, "esperar", "to wait/hope"], [545, "sabemos", "we know"], [546, "recuerdo", "memory/I remember"], [547, "par", "pair/even"], [548, "joven", "young"], [549, "seguir", "to follow/continue"], [550, "pueblo", "town/people"], [551, "tenga", "have"], [552, "caballeros", "gentlemen"], [553, "idiota", "idiot"], [554, "dio", "gave"], [555, "minuto", "minute"], [556, "bebé", "baby"], [557, "única", "only/unique"], [558, "lejos", "far"], [559, "nuestras", "our"], [560, "plan", "plan"], [561, "pienso", "I think"], [562, "sentido", "sense/meaning"], [563, "dormir", "to sleep"], [564, "digas", "you say"], [565, "palabra", "word"], [566, "correcto", "correct/right"], [567, "control", "control"], [568, "vemos", "we see"], [569, "entiendes", "you understand"], [570, "país", "country"], [571, "seis", "six"], [572, "último", "last"], [573, "ésta", "this one"], [574, "diga", "say"], [575, "podrías", "you could"], [576, "pequeña", "small"], [577, "cállate", "shut up"], [578, "trato", "deal/treatment"], [579, "rey", "king"], [580, "sucede", "happens"], [581, "muchachos", "boys/guys"], [582, "jamás", "never"], [583, "cama", "bed"], [584, "srta", "miss"], [585, "ayudar", "to help"], [586, "acerca", "about/near"], [587, "di", "I gave/tell"], [588, "cambio", "change"], [589, "falta", "lack/missing"], [590, "hospital", "hospital"], [591, "lleva", "carries/wears"], [592, "presidente", "president"], [593, "mil", "thousand"], [594, "gusto", "taste/pleasure"], [595, "conoces", "you know"], [596, "diciendo", "saying"], [597, "os", "you (plural object)"], [598, "ido", "gone"], [599, "general", "general"], [600, "extraño", "strange/stranger"], [601, "semanas", "weeks"], [602, "coche", "car"], [603, "peor", "worse/worst"], [604, "mucha", "much/a lot"], [605, "disculpe", "excuse me"], [606, "diré", "I will say"], [607, "anoche", "last night"], [608, "perder", "to lose"], [609, "vámonos", "let's go"], [610, "nave", "ship"], [611, "cielo", "sky/heaven"], [612, "habrá", "there will be"], [613, "orden", "order"], [614, "segura", "safe/sure"], [615, "querida", "dear"], [616, "niña", "girl"], [617, "increíble", "incredible"], [618, "además", "besides/moreover"], [619, "deben", "they must/should"], [620, "libro", "book"], [621, "calle", "street"], [622, "café", "coffee"], [623, "piensas", "you think"], [624, "hacemos", "we do/make"], [625, "especial", "special"], [626, "queremos", "we want"], [627, "irme", "to leave/go"], [628, "perfecto", "perfect"], [629, "buscar", "to search/look for"], [630, "odio", "hate"], [631, "piensa", "thinks"], [632, "oficina", "office"], [633, "hablas", "you speak"], [634, "libre", "free"], [635, "agente", "agent"], [636, "york", "York"], [637, "llamar", "to call"], [638, "mala", "bad"], [639, "detrás", "behind"], [640, "viste", "you saw/wore"], [641, "dile", "tell him/her"], [642, "grandes", "big/great"], [643, "recuerdas", "you remember"], [644, "real", "real"], [645, "estaban", "they were"], [646, "mía", "mine"], [647, "frente", "front"], [648, "perdido", "lost"], [649, "llamo", "I call"], [650, "muertos", "dead people/dead"], [651, "millones", "millions"], [652, "asesino", "killer"], [653, "sueño", "dream/sleep"], [654, "quisiera", "I would like"], [655, "habría", "would have"], [656, "hará", "will do/make"], [657, "viaje", "trip/journey"], [658, "probablemente", "probably"], [659, "resto", "rest/rest"], [660, "estaré", "I will be"], [661, "maldición", "damn/curse"], [662, "lamento", "regret/sorry"], [663, "muchacho", "boy"], [664, "avión", "airplane"], [665, "ropa", "clothes"], [666, "fuerza", "strength/force"], [667, "llamado", "called/call"], [668, "oído", "heard/ear"], [669, "dado", "given"], [670, "encima", "on top/above"], [671, "negro", "black"], [672, "usar", "to use"], [673, "información", "information"], [674, "uds", "you (plural)"], [675, "preguntas", "questions"], [676, "tuvo", "had"], [677, "secreto", "secret"], [678, "vuelve", "returns"], [679, "miren", "look"], [680, "quieras", "you want"], [681, "haría", "would do/make"], [682, "acaba", "finishes/just"], [683, "otras", "other"], [684, "incluso", "even"], [685, "sientes", "you feel"], [686, "deberíamos", "we should"], [687, "haz", "do/make"], [688, "decirte", "to tell you"], [689, "boca", "mouth"], [690, "dolor", "pain"], [691, "baño", "bathroom/bath"], [692, "adentro", "inside"], [693, "profesor", "teacher"], [694, "habitación", "room"], [695, "daño", "damage/harm"], [696, "tuyo", "yours"], [697, "seas", "you are/be"], [698, "noticias", "news"], [699, "demás", "others/rest"], [700, "querido", "dear/loved"], [701, "duro", "hard/tough"], [702, "poner", "to put"], [703, "prueba", "test/proof"], [704, "mire", "look"], [705, "tonto", "silly/foolish"], [706, "campo", "field/countryside"], [707, "siendo", "being"], [708, "diez", "ten"], [709, "ése", "that one"], [710, "tranquilo", "calm"], [711, "asunto", "matter/business"], [712, "acabó", "finished/ended"], [713, "quédate", "stay"], [714, "derecho", "right/law"], [715, "placer", "pleasure"], [716, "recuerda", "remember"], [717, "estuve", "I was"], [718, "tratando", "trying"], [719, "ejército", "army"], [720, "futuro", "future"], [721, "llevar", "to carry/wear"], [722, "compañía", "company"], [723, "venido", "come"], [724, "listos", "ready"], [725, "haremos", "we will do/make"], [726, "sitio", "place/site"], [727, "verlo", "to see it/him"], [728, "puesto", "placed/position"], [729, "atención", "attention"], [730, "sino", "but rather"], [731, "cambiar", "to change"], [732, "error", "error/mistake"], [733, "blanco", "white"], [734, "raro", "strange/rare"], [735, "palabras", "words"], [736, "llegó", "arrived"], [737, "sal", "salt/leave"], [738, "pase", "pass/come in"], [739, "mente", "mind"], [740, "sistema", "system"], [741, "película", "movie"], [742, "anda", "walk/go"], [743, "ello", "it"], [744, "negocio", "business"], [745, "novia", "girlfriend"], [746, "permiso", "permission"], [747, "creí", "I believed/thought"], [748, "suena", "sounds"], [749, "ocurre", "happens"], [750, "oficial", "official"], [751, "espere", "wait"], [752, "aire", "air"], [753, "mató", "killed"], [754, "regresar", "to return"], [755, "vio", "saw"], [756, "hazlo", "do it"], [757, "trasero", "rear/backside"], [758, "grupo", "group"], [759, "entendido", "understood"], [760, "señorita", "miss"], [761, "música", "music"], [762, "perra", "female dog/bitch"], [763, "conoce", "knows"], [764, "empezar", "to start"], [765, "siente", "feels"], [766, "acabo", "I finish/just"], [767, "estúpido", "stupid"], [768, "diferente", "different"], [769, "traje", "suit/brought"], [770, "modo", "way/mode"], [771, "encontré", "I found"], [772, "mensaje", "message"], [773, "llamada", "call"], [774, "navidad", "Christmas"], [775, "eras", "you were"], [776, "pena", "sorrow/pity"], [777, "largo", "long"], [778, "entra", "enters/come in"], [779, "piso", "floor/apartment"], [780, "foto", "photo"], [781, "dijeron", "they said"], [782, "médico", "doctor/medical"], [783, "accidente", "accident"], [784, "fuiste", "you went/were"], [785, "imposible", "impossible"], [786, "podríamos", "we could"], [787, "línea", "line"], [788, "propia", "own"], [789, "barco", "boat"], [790, "ganar", "to win"], [791, "normal", "normal"], [792, "segundos", "seconds"], [793, "vive", "lives"], [794, "mitad", "half"], [795, "quiera", "want/may"], [796, "tras", "after/behind"], [797, "decirle", "to tell him/her"], [798, "lindo", "pretty/nice"], [799, "funciona", "works"], [800, "programa", "program/programme"], [801, "vine", "I came"], [802, "abre", "opens"], [803, "sean", "be/are"], [804, "pagar", "to pay"], [805, "fotos", "photos"], [806, "centro", "center"], [807, "supone", "supposes/means"], [808, "basura", "trash"], [809, "situación", "situation"], [810, "mejores", "better/best"], [811, "vienen", "they come"], [812, "encanta", "loves/likes"], [813, "marido", "husband"], [814, "personal", "personal/staff"], [815, "maestro", "teacher/master"], [816, "hambre", "hunger"], [817, "ataque", "attack"], [818, "culo", "ass/butt"], [819, "dale", "give it/come on"], [820, "pie", "foot"], [821, "conseguir", "to get/obtain"], [822, "trabajando", "working"], [823, "gracioso", "funny"], [824, "dejó", "left/let"], [825, "pudo", "could/was able"], [826, "derecha", "right"], [827, "izquierda", "left"], [828, "próxima", "next"], [829, "pobre", "poor"], [830, "respuesta", "answer"], [831, "tipos", "types/guys"], [832, "sentir", "to feel"], [833, "tenías", "you had"], [834, "pude", "I could"], [835, "darle", "to give him/her"], [836, "voz", "voice"], [837, "amiga", "female friend"], [838, "gustan", "like/are liked"], [839, "vista", "view/sight"], [840, "salvo", "except/safe"], [841, "loca", "crazy"], [842, "hotel", "hotel"], [843, "hicieron", "they did/made"], [844, "ten", "have/take"], [845, "temo", "I fear"], [846, "señal", "signal/sign"], [847, "pelo", "hair"], [848, "llevo", "I carry/wear"], [849, "ayer", "yesterday"], [850, "das", "you give"], [851, "nena", "girl/baby"], [852, "servicio", "service"], [853, "tren", "train"], [854, "bonito", "pretty/nice"], [855, "mes", "month"], [856, "tendrá", "will have"], [857, "tendrás", "you will have"], [858, "edad", "age"], [859, "ellas", "they (fem.)"], [860, "hermosa", "beautiful"], [861, "honor", "honor"], [862, "simplemente", "simply"], [863, "llamas", "you call/flames"], [864, "tengas", "have"], [865, "corre", "runs"], [866, "baja", "low/goes down"], [867, "sol", "sun"], [868, "siéntate", "sit down"], [869, "dan", "they give"], [870, "humano", "human"], [871, "divertido", "fun"], [872, "sexo", "sex"], [873, "vuelto", "returned"], [874, "peligro", "danger"], [875, "mesa", "table"], [876, "siguiente", "next/following"], [877, "hablo", "I speak"], [878, "disculpa", "sorry/excuse"], [879, "decirme", "to tell me"], [880, "caja", "box"], [881, "negocios", "businesses"], [882, "misión", "mission"], [883, "silencio", "silence"], [884, "sale", "leaves/comes out"], [885, "llegado", "arrived"], [886, "estaría", "would be"], [887, "regreso", "return"], [888, "media", "half/average"], [889, "estan", "are"], [890, "propio", "own"], [891, "oro", "gold"], [892, "enseguida", "right away"], [893, "linda", "pretty"], [894, "prometo", "I promise"], [895, "esposo", "husband"], [896, "norte", "north"], [897, "hubo", "there was/were"], [898, "juro", "I swear"], [899, "muerta", "dead"], [900, "interesante", "interesting"], [901, "pensaba", "I thought"], [902, "busca", "looks for/searches"], [903, "terminar", "to finish"], [904, "tendré", "I will have"], [905, "completamente", "completely"], [906, "cita", "appointment/date/quote"], [907, "siete", "seven"], [908, "cumpleaños", "birthday"], [909, "abogado", "lawyer"], [910, "alrededor", "around"], [911, "cerebro", "brain"], [912, "porqué", "reason/why"], [913, "llave", "key"], [914, "santo", "holy/saint"], [915, "hermoso", "beautiful"], [916, "necesario", "necessary"], [917, "edificio", "building"], [918, "irnos", "to leave/go"], [919, "aun", "still/even"], [920, "tendremos", "we will have"], [921, "vayas", "you go"], [922, "doy", "I give"], [923, "trae", "brings"], [924, "salió", "left/came out"], [925, "ley", "law"], [926, "ahi", "there"], [927, "verdadero", "true"], [928, "pelea", "fight"], [929, "banco", "bank/bench"], [930, "terrible", "terrible"], [931, "calma", "calm"], [932, "cena", "dinner"], [933, "daré", "I will give"], [934, "gobierno", "government"], [935, "comprar", "to buy"], [936, "creen", "they believe"], [937, "sargento", "sergeant"], [938, "destino", "destiny/destination"], [939, "existe", "exists"], [940, "hacía", "was doing/making"], [941, "novio", "boyfriend"], [942, "sala", "room/hall"], [943, "través", "through"], [944, "regalo", "gift"], [945, "iglesia", "church"], [946, "decía", "was saying"], [947, "cualquiera", "anyone/any"], [948, "excelente", "excellent"], [949, "esperen", "wait"], [950, "deseo", "wish/desire"], [951, "alma", "soul"], [952, "diablo", "devil"], [953, "deje", "leave/let"], [954, "cuántos", "how many"], [955, "espada", "sword"], [956, "estábamos", "we were"], [957, "carne", "meat/flesh"], [958, "maravilloso", "wonderful"], [959, "vidas", "lives"], [960, "sucedió", "happened"], [961, "oí", "I heard"], [962, "peligroso", "dangerous"], [963, "dirección", "direction/address"], [964, "libertad", "freedom"], [965, "jesús", "Jesus"], [966, "ocurrió", "happened"], [967, "veré", "I will see"], [968, "sueños", "dreams"], [969, "pudiera", "could/might"], [970, "detective", "detective"], [971, "sorpresa", "surprise"], [972, "tuya", "yours"], [973, "pies", "feet"], [974, "club", "club"], [975, "terminado", "finished"], [976, "infierno", "hell"], [977, "creía", "I believed/thought"], [978, "luna", "moon"], [979, "salvar", "to save"], [980, "carta", "letter/card"], [981, "estés", "you are/be"], [982, "cielos", "skies/heavens"], [983, "teniente", "lieutenant"], [984, "encuentra", "finds"], [985, "veamos", "let's see"], [986, "quise", "I wanted"], [987, "escúchame", "listen to me"], [988, "necesitan", "they need"], [989, "ambos", "both"], [990, "decisión", "decision"], [991, "enemigo", "enemy"], [992, "hicimos", "we did/made"], [993, "dulce", "sweet/candy"], [994, "pruebas", "tests/proofs"], [995, "querías", "you wanted"], [996, "abuelo", "grandfather"], [997, "totalmente", "totally/completely"], [998, "mirando", "looking/watching"], [999, "vayan", "go (plural)"], [1000, "carrera", "race/career"]];
+
+extraData.forEach(([rank, word, translation]) => {
+  words.push({ rank, word, ppm: null, lemma: word, translation });
+});
+
+// App Logic
+let currentMode = 'reader';
+let currentTestIndex = 0;
+let testQueue = [];
+let score = { correct: 0, total: 0 };
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.getElementById('btn-reader').classList.toggle('active', mode === 'reader');
+  document.getElementById('btn-test').classList.toggle('active', mode === 'test');
+  document.getElementById('mode-reader').classList.toggle('hidden', mode !== 'reader');
+  document.getElementById('mode-test').classList.toggle('hidden', mode !== 'test');
+
+  if (mode === 'test' && testQueue.length === 0) {
+    resetTest();
+  }
+}
+
+function renderTable() {
+  const query = document.getElementById('search').value.toLowerCase();
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+
+  words.filter(item => 
+    item.word.toLowerCase().includes(query) || 
+    item.lemma.toLowerCase().includes(query) ||
+    item.translation.toLowerCase().includes(query)
+  ).forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${item.rank}</td>
+      <td><strong>${item.word}</strong></td>
+      <td>${item.lemma}</td>
+      <td>${item.translation}</td>
+      <td>${item.ppm ?? '—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function resetTest() {
+  const limit = parseInt(document.getElementById('test-range').value);
+  testQueue = [...words.slice(0, limit)].sort(() => Math.random() - 0.5);
+  currentTestIndex = 0;
+  score = { correct: 0, total: 0 };
+  updateScore();
+  showNextQuestion();
+}
+
+function showNextQuestion() {
+  if (currentTestIndex >= testQueue.length) {
+    document.getElementById('prompt-word').textContent = "Complete!";
+    document.getElementById('prompt-sub').textContent = "You finished all questions in this range.";
+    return;
+  }
+
+  const current = testQueue[currentTestIndex];
+  const direction = document.getElementById('test-direction').value;
+  
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('test-input').value = '';
+  document.getElementById('test-input').focus();
+
+  if (direction === 'es-en') {
+    document.getElementById('prompt-word').textContent = current.word;
+    document.getElementById('prompt-sub').textContent = `Lemma: ${current.lemma}`;
+  } else {
+    document.getElementById('prompt-word').textContent = current.translation;
+    document.getElementById('prompt-sub').textContent = `Rank #${current.rank}`;
+  }
+}
+
+function checkAnswer(e) {
+  e.preventDefault();
+  if (currentTestIndex >= testQueue.length) return;
+
+  const current = testQueue[currentTestIndex];
+  const direction = document.getElementById('test-direction').value;
+  const input = document.getElementById('test-input').value.trim().toLowerCase();
+  const feedback = document.getElementById('feedback');
+
+  let isCorrect = false;
+  let answerTarget = "";
+
+  if (direction === 'es-en') {
+    answerTarget = current.translation.toLowerCase();
+    isCorrect = answerTarget.includes(input) && input.length > 0;
+  } else {
+    answerTarget = current.word.toLowerCase();
+    isCorrect = (input === answerTarget || input === current.lemma.toLowerCase());
+  }
+
+  score.total++;
+  if (isCorrect) {
+    score.correct++;
+    feedback.textContent = 'Correct!';
+    feedback.className = 'feedback correct';
+  } else {
+    feedback.textContent = `Incorrect. Answer was: ${direction === 'es-en' ? current.translation : current.word}`;
+    feedback.className = 'feedback incorrect';
+  }
+
+  updateScore();
+  currentTestIndex++;
+  setTimeout(showNextQuestion, 1500);
+}
+
+function updateScore() {
+  document.getElementById('score-correct').textContent = score.correct;
+  document.getElementById('score-total').textContent = score.total;
+  const acc = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0;
+  document.getElementById('score-acc').textContent = `${acc}%`;
+}
+
+// Initial render
+renderTable();
+</script>
+</body>
+</html>
